@@ -12,6 +12,12 @@ on:
       - master
       - develop
 
+# Permisos necesarios para el workflow
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -88,14 +94,35 @@ jobs:
             trabajoengrupo/target/surefire-reports/
           retention-days: 30
 
-      # Paso 11: Publicar resultados de pruebas
+      # Paso 11: Publicar resultados de pruebas (solo en push, no en PR de forks)
       - name: Publish Test Results
         uses: dorny/test-reporter@v1
-        if: success() || failure()
+        if: (success() || failure()) && github.event_name == 'push'
         with:
           name: Maven Tests - Sistema Votación
           path: trabajoengrupo/target/surefire-reports/*.xml
           reporter: java-junit
+          
+      # Paso alternativo: Mostrar resumen de pruebas para PR
+      - name: Test Summary for PR
+        if: (success() || failure()) && github.event_name == 'pull_request'
+        run: |
+          echo "## 📊 Resumen de Pruebas" >> $GITHUB_STEP_SUMMARY
+          if [ -d target/surefire-reports ]; then
+            TOTAL_TESTS=$(find target/surefire-reports -name "TEST-*.xml" -exec grep -o 'tests="[0-9]*"' {} \; | grep -o '[0-9]*' | awk '{sum+=$1} END {print sum}')
+            FAILED_TESTS=$(find target/surefire-reports -name "TEST-*.xml" -exec grep -o 'failures="[0-9]*"' {} \; | grep -o '[0-9]*' | awk '{sum+=$1} END {print sum}')
+            ERRORS=$(find target/surefire-reports -name "TEST-*.xml" -exec grep -o 'errors="[0-9]*"' {} \; | grep -o '[0-9]*' | awk '{sum+=$1} END {print sum}')
+            
+            echo "- ✅ Pruebas ejecutadas: ${TOTAL_TESTS:-0}" >> $GITHUB_STEP_SUMMARY
+            echo "- ❌ Pruebas fallidas: ${FAILED_TESTS:-0}" >> $GITHUB_STEP_SUMMARY
+            echo "- ⚠️ Errores: ${ERRORS:-0}" >> $GITHUB_STEP_SUMMARY
+            
+            if [ "${FAILED_TESTS:-0}" -eq 0 ] && [ "${ERRORS:-0}" -eq 0 ]; then
+              echo "- 🎉 **Todas las pruebas pasaron exitosamente!**" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "- ⚠️ No se encontraron reportes de pruebas" >> $GITHUB_STEP_SUMMARY
+          fi
 
   # Job adicional para análisis de seguridad
   security-scan:
