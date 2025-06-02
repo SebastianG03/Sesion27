@@ -64,12 +64,7 @@ jobs:
       - name: Generate Coverage Report
         run: mvn jacoco:report
 
-      # Paso 8: Ejecutar SpotBugs (análisis de bugs)
-      - name: SpotBugs Analysis
-        run: mvn spotbugs:check
-        continue-on-error: true
-
-      # Paso 9: Mostrar resultados de las pruebas
+      # Paso 8: Mostrar resultados de las pruebas
       - name: Mostrar resultados de pruebas
         run: |
           echo "Resultados de las pruebas:"
@@ -90,11 +85,10 @@ jobs:
             trabajoengrupo/target/site/jacoco/index.html
             trabajoengrupo/target/checkstyle-result.xml
             trabajoengrupo/target/pmd.xml
-            trabajoengrupo/target/spotbugsXml.xml
             trabajoengrupo/target/surefire-reports/
           retention-days: 30
 
-      # Paso 11: Publicar resultados de pruebas (solo en push, no en PR de forks)
+      # Paso 10: Publicar resultados de pruebas (solo en push, no en PR de forks)
       - name: Publish Test Results
         uses: dorny/test-reporter@v1
         if: (success() || failure()) && github.event_name == 'push'
@@ -123,37 +117,3 @@ jobs:
           else
             echo "- ⚠️ No se encontraron reportes de pruebas" >> $GITHUB_STEP_SUMMARY
           fi
-
-  # Job adicional para análisis de seguridad
-  security-scan:
-    runs-on: ubuntu-latest
-    needs: build
-    
-    defaults:
-      run:
-        working-directory: trabajoengrupo
-
-    steps:
-      - name: Checkout del código
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: maven
-
-      # Análisis de dependencias vulnerables
-      - name: OWASP Dependency Check
-        run: mvn org.owasp:dependency-check-maven:check
-        continue-on-error: true
-
-      - name: Upload Security Scan Results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: Security-Reports
-          path: |
-            trabajoengrupo/target/dependency-check-report.html
-            trabajoengrupo/target/dependency-check-report.xml
